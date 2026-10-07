@@ -84,7 +84,6 @@ const server = http.createServer((req, res) => {
     },
     (upstreamRes) => {
       const outHeaders = { ...upstreamRes.headers, "Access-Control-Allow-Origin": "*" };
-      delete outHeaders["content-encoding"]; // avoid double compression mismatches
       res.writeHead(upstreamRes.statusCode || 200, outHeaders);
       upstreamRes.pipe(res);
     }
