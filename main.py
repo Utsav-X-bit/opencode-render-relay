@@ -36,19 +36,22 @@ async def relay_all(request: Request, path: str):
             return JSONResponse({"error": "Unauthorized access"}, status_code=401)
 
     # 4. Path mapping (supports pi-bansos relay headers and direct path forwarding)
+    relay_target = request.headers.get("x-relay-target")
     relay_path = request.headers.get("x-relay-path")
-    if relay_path:
-        target_path = relay_path
-    elif path.startswith("v1/"):
-        target_path = f"/zen/{path}"
-    elif path.startswith("zen/"):
-        target_path = f"/{path}"
+    if relay_target:
+        target_url = f"{relay_target.rstrip('/')}{relay_path or '/'}"
     else:
-        target_path = f"/zen/v1/{path}"
+        if path.startswith("v1/"):
+            target_path = f"/zen/{path}"
+        elif path.startswith("zen/"):
+            target_path = f"/{path}"
+        else:
+            target_path = f"/zen/v1/{path}"
+        target_url = f"{UPSTREAM_HOST}{target_path}"
 
-    target_url = f"{UPSTREAM_HOST}{target_path}"
     if request.url.query:
-        target_url = f"{target_url}?{request.url.query}"
+        sep = "&" if "?" in target_url else "?"
+        target_url = f"{target_url}{sep}{request.url.query}"
 
     # 5. Header sanitization
     headers = {}
