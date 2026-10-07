@@ -60,11 +60,11 @@ const server = http.createServer((req, res) => {
 
   // 5. Clean and forward headers
   const headers = { ...req.headers };
-  delete headers.host;
   delete headers["content-length"];
   delete headers["x-relay-token"];
   delete headers["x-relay-target"];
   delete headers["x-relay-path"];
+  headers.host = targetHost;
 
   // Enforce authentic OpenCode User-Agent
   const ua = headers["user-agent"] || "";
@@ -76,6 +76,7 @@ const server = http.createServer((req, res) => {
   const upstreamReq = https.request(
     {
       hostname: targetHost,
+      servername: targetHost,
       port: 443,
       path: targetPath,
       method: req.method,
