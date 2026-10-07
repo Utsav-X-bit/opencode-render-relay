@@ -1,0 +1,17 @@
+{
+  "name": "opencode-render-relay",
+  "version": "1.0.0",
+  "description": "Lightweight authenticated edge relay for OpenCode Zen on Render",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "opencode",
+    "relay",
+    "proxy",
+    "render"
+  ],
+  "author": "Utsav Gupta",
+  "license": "MIT"
+}
