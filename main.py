@@ -41,7 +41,12 @@ async def relay_all(request: Request, path: str):
     if relay_target:
         target_url = f"{relay_target.rstrip('/')}{relay_path or '/'}"
     else:
-        if path.startswith("v1/"):
+        norm_path = path.strip("/")
+        if norm_path in ("response", "responses", "v1/response", "v1/responses"):
+            target_path = "/zen/v1/responses"
+        elif norm_path in ("chat/completions", "v1/chat/completions"):
+            target_path = "/zen/v1/chat/completions"
+        elif path.startswith("v1/"):
             target_path = f"/zen/{path}"
         elif path.startswith("zen/"):
             target_path = f"/{path}"
@@ -65,7 +70,44 @@ async def relay_all(request: Request, path: str):
     if not ua or not ua.startswith("opencode/"):
         headers["user-agent"] = DEFAULT_UA
 
+    if "authorization" not in headers:
+        headers["authorization"] = "Bearer public"
+    if "x-opencode-client" not in headers:
+        headers["x-opencode-client"] = "desktop"
+    if "x-opencode-session" not in headers:
+        import time, random
+        now_ms = int(time.time() * 1000)
+        val = (~((now_ms * 0x1000) + random.randint(1, 4095))) & 0xFFFFFFFFFFFF
+        base62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        rnd = "".join(random.choice(base62) for _ in range(14))
+        ses = f"ses_{val:012x}{rnd}"
+        headers["x-opencode-session"] = ses
+        headers["x-session-affinity"] = ses
+
     body = await request.body()
+    if body and ("/responses" in target_url or "/chat/completions" in target_url):
+        try:
+            body_json = json.loads(body.decode("utf-8"))
+            if "/responses" in target_url:
+                body_json["store"] = False
+                if "messages" in body_json and "input" not in body_json:
+                    inp = []
+                    for m in body_json.get("messages", []):
+                        c = m.get("content", "")
+                        if isinstance(c, list):
+                            c = "\n".join(p["text"] if isinstance(p, dict) and "text" in p else str(p) for p in c)
+                        inp.append({"type": "message", "role": m.get("role", "user"), "content": c})
+                    body_json["input"] = inp
+                    del body_json["messages"]
+                if isinstance(body_json.get("input"), list):
+                    for item in body_json["input"]:
+                        if isinstance(item, dict) and isinstance(item.get("content"), list):
+                            item["content"] = "\n".join(p["text"] if isinstance(p, dict) and "text" in p else str(p) for p in item["content"])
+            body = json.dumps(body_json).encode("utf-8")
+            headers["content-length"] = str(len(body))
+        except Exception:
+            pass
+
     is_stream = (
         "text/event-stream" in headers.get("accept", "")
         or b'"stream":true' in body
